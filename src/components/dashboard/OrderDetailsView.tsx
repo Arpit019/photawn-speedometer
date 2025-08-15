@@ -27,9 +27,10 @@ interface OrderDetailsViewProps {
   metricType: string;
   bucketRange: string;
   onBack: () => void;
+  showBackButton?: boolean;
 }
 
-export const OrderDetailsView = ({ orders, metricType, bucketRange, onBack }: OrderDetailsViewProps) => {
+export const OrderDetailsView = ({ orders, metricType, bucketRange, onBack, showBackButton = true }: OrderDetailsViewProps) => {
   const getMetricTitle = (type: string): string => {
     const titles = {
       importCutoff: 'Import Cutoff Time',
@@ -94,29 +95,36 @@ export const OrderDetailsView = ({ orders, metricType, bucketRange, onBack }: Or
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={onBack}
-                className="hover:bg-accent/50"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </Button>
+              {showBackButton && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={onBack}
+                  className="hover:bg-accent/50"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Dashboard
+                </Button>
+              )}
               <div>
                 <CardTitle className="text-xl font-semibold text-foreground">
-                  {getMetricTitle(metricType)} - {bucketRange}
+                  {metricType === 'all' ? 'All Orders' : `${getMetricTitle(metricType)} - ${bucketRange}`}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Showing {orders.length} orders in this time bucket
+                  {metricType === 'all' 
+                    ? `Showing ${orders.length} total orders` 
+                    : `Showing ${orders.length} orders in this time bucket`
+                  }
                 </p>
               </div>
             </div>
             
             <div className="flex items-center space-x-3">
-              <Badge className={`${getBucketColor(bucketRange)} px-3 py-1`}>
-                {bucketRange}
-              </Badge>
+              {bucketRange !== 'all' && (
+                <Badge className={`${getBucketColor(bucketRange)} px-3 py-1`}>
+                  {bucketRange}
+                </Badge>
+              )}
               <Button 
                 variant="outline" 
                 size="sm" 
