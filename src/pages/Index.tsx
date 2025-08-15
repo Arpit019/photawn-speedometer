@@ -95,66 +95,42 @@ const Index = () => {
       setIsConnected(false);
       setIsLoading(true);
       
-      console.log('🔄 Connecting to Google Sheets with ID:', targetSheetId);
-      console.log('📊 Looking for Speed_Metric_Data subsheet...');
+      console.log('🔄 Connecting to published Google Sheets CSV...');
       
-      // First, try to get the correct GID by testing the main sheet access
-      console.log('🔄 Testing Google Sheets access...');
-      
-      // Try the most common approach first - direct sheet access with sharing enabled
+      // Try the published CSV link first
       let csvText = '';
       let foundValidSheet = false;
       
-      // Method 1: Try multiple Google Sheets access patterns
-      const gidPatterns = ['0', '1659830995', '1234567890']; // Common GIDs for Speed_Metric_Data sheet
-      
-      for (const gid of gidPatterns) {
-        try {
-          console.log(`📊 Trying access with GID: ${gid}...`);
-          
-          // Try different URL patterns for Google Sheets export
-          const urlPatterns = [
-            `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=${gid}`,
-            `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&usp=sharing&gid=${gid}`,
-            `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=Speed_Metric_Data`,
-            `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&usp=sharing`
-          ];
-          
-          for (const url of urlPatterns) {
-            try {
-              const response = await fetch(url, {
-                method: 'GET',
-                headers: { 
-                  'Accept': 'text/csv',
-                  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-              });
-              
-              if (response.ok) {
-                const testCsv = await response.text();
-                console.log(`Response from ${url}:`, testCsv.substring(0, 200));
-                
-                // Look for expected headers or valid data
-                if (testCsv.includes('Darkstore Name') || testCsv.includes('Brand Name') || 
-                    (testCsv.includes(',') && testCsv.split('\n').length > 2)) {
-                  csvText = testCsv;
-                  foundValidSheet = true;
-                  console.log(`✅ Found valid data via: ${url}`);
-                  break;
-                }
-              }
-            } catch (urlError) {
-              console.log(`URL ${url} failed:`, urlError);
-            }
+      try {
+        console.log('📊 Fetching from published CSV link...');
+        const publishedUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv';
+        
+        const response = await fetch(publishedUrl, {
+          method: 'GET',
+          headers: { 
+            'Accept': 'text/csv',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
           }
+        });
+        
+        if (response.ok) {
+          csvText = await response.text();
+          console.log('📊 Published CSV response:', csvText.substring(0, 300));
           
-          if (foundValidSheet) break;
-        } catch (e) {
-          console.log(`GID ${gid} failed:`, e);
+          if (csvText && csvText.includes(',') && csvText.split('\n').length > 2) {
+            foundValidSheet = true;
+            console.log('✅ Found valid data from published CSV');
+          }
+        } else {
+          console.log('Published CSV request failed:', response.status, response.statusText);
         }
+      } catch (publishedError) {
+        console.log('Published CSV fetch failed:', publishedError);
       }
       
-      // Method 2: If sharing didn't work, use sample data as fallback
+      // Fallback: If published CSV didn't work, use sample data
       if (!foundValidSheet) {
         console.log('📋 Using sample data fallback...');
 csvText = `Darkstore Name,Brand Name,Created At,Import At,Assigned At,Confirmed At,Printed At,Manifest At
@@ -184,27 +160,6 @@ Powai,Samsung,8/23/2025 2:45:00 PM,8/23/2025 2:55:00 PM,8/23/2025 2:57:00 PM,8/2
 Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/24/2025 4:30:00 PM,8/24/2025 4:40:00 PM,8/24/2025 4:45:00 PM`;
         
         console.log('📊 Enhanced sample data loaded with more stores and brands');
-        
-        // Also try to access the real sheet one more time with exponential backoff
-        setTimeout(async () => {
-          try {
-            const retryResponse = await fetch(
-              `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&usp=sharing`,
-              { method: 'GET', headers: { 'Accept': 'text/csv' } }
-            );
-            if (retryResponse.ok) {
-              const retryCsv = await retryResponse.text();
-              if (retryCsv.includes('Darkstore Name') && retryCsv.length > csvText.length) {
-                console.log('🔄 Found updated sheet data, refreshing...');
-                // Trigger a fresh data load without showing loading state
-                processSheetData(retryCsv);
-              }
-            }
-          } catch (retryError) {
-            console.log('Background retry failed:', retryError);
-          }
-        }, 2000);
-        
         console.log('📊 Sample data loaded successfully');
       }
 
@@ -480,26 +435,18 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
     return bucket?.orders || [];
   };
 
+  // Auto-refresh functionality - refresh every 5 minutes
   useEffect(() => {
-    // Auto-connect on load with a small delay to ensure component is mounted
-    const timer = setTimeout(() => {
-      console.log('Auto-connecting to Google Sheets...');
-      connectToSheet();
-    }, 1000);
+    connectToSheet();
     
-    // Set up auto-refresh every 5 minutes
-    const interval = setInterval(() => {
-      if (isConnected) {
-        console.log('Auto-refreshing data...');
-        connectToSheet();
-      }
-    }, 5 * 60 * 1000);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, []);
+    // Set up auto-refresh interval (5 minutes)
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing data from Google Sheets...');
+      connectToSheet();
+    }, 5 * 60 * 1000); // 5 minutes in milliseconds
+    
+    return () => clearInterval(refreshInterval);
+  }, [sheetId]);
 
   return (
     <div className="min-h-screen bg-background">
