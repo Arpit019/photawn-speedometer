@@ -103,7 +103,7 @@ const Index = () => {
       
       try {
         console.log('📊 Fetching from published CSV link...');
-        const publishedUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv';
+        const publishedUrl = `https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv&t=${Date.now()}`;
         
         const response = await fetch(publishedUrl, {
           method: 'GET',
@@ -111,8 +111,10 @@ const Index = () => {
             'Accept': 'text/csv',
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache'
-          }
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          },
+          cache: 'no-store'
         });
         
         if (response.ok) {
@@ -333,7 +335,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
         summary: {
           totalOrders: processedOrders.length,
           avgImportTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0,
-          avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.createdAt.getTime()) / (1000 * 60), 0) / processedOrders.length) : 0,
+          avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60), 0) / processedOrders.length) : 0,
           onTimeRate: processedOrders.length > 0 ? Math.round((processedOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / processedOrders.length) * 100) : 0
         }
       };
@@ -421,7 +423,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       summary: {
         totalOrders: filteredOrders.length,
         avgImportTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.importCutoff, 0) / filteredOrders.length) : 0,
-        avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.createdAt.getTime()) / (1000 * 60), 0) / filteredOrders.length) : 0,
+        avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60), 0) / filteredOrders.length) : 0,
         onTimeRate: filteredOrders.length > 0 ? Math.round((filteredOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / filteredOrders.length) * 100) : 0
       }
     };
