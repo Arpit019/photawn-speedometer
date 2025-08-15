@@ -290,6 +290,23 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           const labelCutoff = Math.max(0, Math.round((printedAt.getTime() - confirmedAt.getTime()) / (1000 * 60)));
           const pickupCutoff = Math.max(0, Math.round((manifestAt.getTime() - printedAt.getTime()) / (1000 * 60)));
 
+          // Calculate total processing time from import to manifest
+          const totalProcessingTime = Math.max(0, Math.round((manifestAt.getTime() - importAt.getTime()) / (1000 * 60)));
+          
+          // Debug logging for first few orders
+          if (index < 3) {
+            console.log(`Order ${index + 1} processing times:`, {
+              importAt: importAt.toISOString(),
+              manifestAt: manifestAt.toISOString(),
+              totalProcessingTime,
+              importCutoff,
+              inventoryAssignCutoff,
+              batchPickCutoff,
+              labelCutoff,
+              pickupCutoff
+            });
+          }
+
           return {
             id: row['Order ID'] || row['ID'] || `ORD-${String(index + 1).padStart(4, '0')}`,
             darkstoreName: row['Darkstore Name'] || 'Unknown Store',
@@ -323,6 +340,22 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       }));
     };
 
+      // Debug the final summary
+      console.log('📊 Final processed summary:', {
+        totalOrders: processedOrders.length,
+        avgImportTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0,
+        avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => {
+          const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
+          return sum + totalTime;
+        }, 0) / processedOrders.length) : 0,
+        sampleTotalTimes: processedOrders.slice(0, 3).map(o => ({
+          orderId: o.id,
+          importAt: o.importAt.toISOString(),
+          manifestAt: o.manifestAt.toISOString(),
+          totalMinutes: (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60)
+        }))
+      });
+
       return {
         orders: processedOrders,
         metrics: {
@@ -335,7 +368,10 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
         summary: {
           totalOrders: processedOrders.length,
           avgImportTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0,
-          avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60), 0) / processedOrders.length) : 0,
+          avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => {
+            const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
+            return sum + totalTime;
+          }, 0) / processedOrders.length) : 0,
           onTimeRate: processedOrders.length > 0 ? Math.round((processedOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / processedOrders.length) * 100) : 0
         }
       };
@@ -423,7 +459,10 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       summary: {
         totalOrders: filteredOrders.length,
         avgImportTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.importCutoff, 0) / filteredOrders.length) : 0,
-        avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60), 0) / filteredOrders.length) : 0,
+        avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => {
+          const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
+          return sum + totalTime;
+        }, 0) / filteredOrders.length) : 0,
         onTimeRate: filteredOrders.length > 0 ? Math.round((filteredOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / filteredOrders.length) * 100) : 0
       }
     };
