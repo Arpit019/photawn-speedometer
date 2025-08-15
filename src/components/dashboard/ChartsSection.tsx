@@ -1,13 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-interface ChartsData {
-  distribution: Array<{ name: string; value: number }>;
-  compliance: Array<{ name: string; value: number }>;
+interface MetricBucket {
+  range: string;
+  count: number;
+  orders: any[];
+}
+
+interface TimeMetrics {
+  importCutoff: MetricBucket[];
+  inventoryAssign: MetricBucket[];
+  batchPick: MetricBucket[];
+  labelPrint: MetricBucket[];
+  pickupCutoff: MetricBucket[];
 }
 
 interface ChartsSectionProps {
-  data: ChartsData;
+  metrics: TimeMetrics;
 }
 
 const COLORS = {
@@ -15,22 +24,37 @@ const COLORS = {
   compliance: ['hsl(var(--success))', 'hsl(var(--error))']
 };
 
-export const ChartsSection = ({ data }: ChartsSectionProps) => {
+export const ChartsSection = ({ metrics }: ChartsSectionProps) => {
+  // Transform metrics data for charts
+  const timeDistributionData = [
+    { name: '0-15 mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[0]?.count || 0), 0) },
+    { name: '15-25 mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[1]?.count || 0), 0) },
+    { name: '25+ mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[2]?.count || 0), 0) }
+  ];
+
+  const metricComparisonData = [
+    { name: 'Import', fast: metrics.importCutoff[0]?.count || 0, medium: metrics.importCutoff[1]?.count || 0, slow: metrics.importCutoff[2]?.count || 0 },
+    { name: 'Inventory', fast: metrics.inventoryAssign[0]?.count || 0, medium: metrics.inventoryAssign[1]?.count || 0, slow: metrics.inventoryAssign[2]?.count || 0 },
+    { name: 'Batch/Pick', fast: metrics.batchPick[0]?.count || 0, medium: metrics.batchPick[1]?.count || 0, slow: metrics.batchPick[2]?.count || 0 },
+    { name: 'Label', fast: metrics.labelPrint[0]?.count || 0, medium: metrics.labelPrint[1]?.count || 0, slow: metrics.labelPrint[2]?.count || 0 },
+    { name: 'Pickup', fast: metrics.pickupCutoff[0]?.count || 0, medium: metrics.pickupCutoff[1]?.count || 0, slow: metrics.pickupCutoff[2]?.count || 0 }
+  ];
+
   return (
     <section className="space-y-4">
-      <h2 className="text-2xl font-semibold text-foreground">Analytics</h2>
+      <h2 className="text-2xl font-semibold text-foreground gradient-text">Performance Analytics</h2>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="chart-container">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-foreground">
-              Order Distribution
+              Overall Time Distribution
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={data.distribution}
+                  data={timeDistributionData}
                   cx="50%"
                   cy="50%"
                   labelLine={false}
@@ -39,7 +63,7 @@ export const ChartsSection = ({ data }: ChartsSectionProps) => {
                   fill="#8884d8"
                   dataKey="value"
                 >
-                  {data.distribution.map((entry, index) => (
+                  {timeDistributionData.map((entry, index) => (
                     <Cell 
                       key={`cell-${index}`} 
                       fill={COLORS.distribution[index % COLORS.distribution.length]} 
@@ -62,12 +86,12 @@ export const ChartsSection = ({ data }: ChartsSectionProps) => {
         <Card className="chart-container">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-foreground">
-              Compliance Overview
+              Metric Performance Comparison
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.compliance}>
+              <BarChart data={metricComparisonData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis 
                   dataKey="name" 
@@ -86,11 +110,9 @@ export const ChartsSection = ({ data }: ChartsSectionProps) => {
                     color: 'hsl(var(--card-foreground))'
                   }}
                 />
-                <Bar 
-                  dataKey="value" 
-                  fill="hsl(var(--primary))"
-                  radius={[4, 4, 0, 0]}
-                />
+                <Bar dataKey="fast" stackId="a" fill="hsl(var(--success))" name="0-15 mins" />
+                <Bar dataKey="medium" stackId="a" fill="hsl(var(--warning))" name="15-25 mins" />
+                <Bar dataKey="slow" stackId="a" fill="hsl(var(--error))" name="25+ mins" />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
