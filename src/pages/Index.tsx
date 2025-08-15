@@ -7,6 +7,7 @@ import { TimeMetricsGrid } from "@/components/dashboard/TimeMetricsGrid";
 import { OrderDetailsView } from "@/components/dashboard/OrderDetailsView";
 import { ChartsSection } from "@/components/dashboard/ChartsSection";
 import { SettingsModal } from "@/components/dashboard/SettingsModal";
+import { FiltersSection } from "@/components/dashboard/FiltersSection";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderData {
@@ -77,6 +78,12 @@ const Index = () => {
   const [sheetId, setSheetId] = useState("1oyCjFS754qAW88vpEcqWeR_avTgwv3FWvVV66GJNqI4");
   const [selectedDarkstore, setSelectedDarkstore] = useState<string>("all");
   const [darkstores, setDarkstores] = useState<string[]>([]);
+  const [selectedBrand, setSelectedBrand] = useState<string>("all");
+  const [brands, setBrands] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
+    start: '',
+    end: ''
+  });
   const { toast } = useToast();
 
   const connectToSheet = async (newSheetId?: string) => {
@@ -86,10 +93,10 @@ const Index = () => {
       
       console.log('Connecting to Google Sheets with ID:', targetSheetId);
       
-      // Use the correct sheet name format for Google Sheets export
+      // Use the direct CSV export URL for Google Sheets
       const sheetName = 'speed_metric_data';
       const response = await fetch(
-        `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+        `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=0`,
         {
           method: 'GET',
           headers: {
@@ -115,9 +122,11 @@ const Index = () => {
       
       setDashboardData(processedData);
       
-      // Extract unique darkstore names for filtering
+      // Extract unique darkstore names and brands for filtering
       const uniqueDarkstores = [...new Set(processedData.orders.map(order => order.darkstoreName))].sort();
+      const uniqueBrands = [...new Set(processedData.orders.map(order => order.brandName))].sort();
       setDarkstores(uniqueDarkstores);
+      setBrands(uniqueBrands);
 
       setIsConnected(true);
       setLastUpdate(new Date());
@@ -289,9 +298,27 @@ const Index = () => {
   };
 
   const getFilteredData = (): DashboardData => {
-    if (selectedDarkstore === "all") return dashboardData;
+    let filteredOrders = dashboardData.orders;
     
-    const filteredOrders = dashboardData.orders.filter(order => order.darkstoreName === selectedDarkstore);
+    // Filter by darkstore
+    if (selectedDarkstore !== "all") {
+      filteredOrders = filteredOrders.filter(order => order.darkstoreName === selectedDarkstore);
+    }
+    
+    // Filter by brand
+    if (selectedBrand !== "all") {
+      filteredOrders = filteredOrders.filter(order => order.brandName === selectedBrand);
+    }
+    
+    // Filter by date range
+    if (dateRange.start && dateRange.end) {
+      const startDate = new Date(dateRange.start);
+      const endDate = new Date(dateRange.end);
+      filteredOrders = filteredOrders.filter(order => {
+        const orderDate = new Date(order.createdAt);
+        return orderDate >= startDate && orderDate <= endDate;
+      });
+    }
     
     const createMetricBuckets = (orders: OrderData[], metricKey: keyof Pick<OrderData, 'importCutoff' | 'inventoryAssignCutoff' | 'batchPickCutoff' | 'labelCutoff' | 'pickupCutoff'>): MetricBucket[] => {
       const buckets = ['0-15 mins', '15-25 mins', '25+ mins'];
@@ -368,37 +395,25 @@ const Index = () => {
           onRefresh={() => connectToSheet()}
         />
         
-        {/* Dark Store Filter */}
-        {darkstores.length > 0 && (
-          <div className="animate-fade-in mb-6">
-            <div className="flex flex-wrap items-center gap-4 p-4 bg-card/50 rounded-lg border border-border/50">
-              <span className="text-sm font-medium text-muted-foreground">Filter by Dark Store:</span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setSelectedDarkstore("all")}
-                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                    selectedDarkstore === "all" 
-                      ? "bg-primary text-primary-foreground" 
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  }`}
-                >
-                  All Stores ({dashboardData.orders.length})
-                </button>
-                {darkstores.map((darkstore) => (
-                  <button
-                    key={darkstore}
-                    onClick={() => setSelectedDarkstore(darkstore)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      selectedDarkstore === darkstore 
-                        ? "bg-primary text-primary-foreground" 
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {darkstore} ({dashboardData.orders.filter(o => o.darkstoreName === darkstore).length})
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Filters Section */}
+        {(darkstores.length > 0 || brands.length > 0) && (
+          <div className="animate-fade-in">
+            <FiltersSection
+              darkstores={darkstores}
+              brands={brands}
+              selectedDarkstore={selectedDarkstore}
+              selectedBrand={selectedBrand}
+              dateRange={dateRange}
+              totalOrders={dashboardData.orders.length}
+              onDarkstoreChange={setSelectedDarkstore}
+              onBrandChange={setSelectedBrand}
+              onDateRangeChange={setDateRange}
+              onClearFilters={() => {
+                setSelectedDarkstore("all");
+                setSelectedBrand("all");
+                setDateRange({ start: '', end: '' });
+              }}
+            />
           </div>
         )}
 
@@ -419,6 +434,8 @@ const Index = () => {
                   <div className="text-sm text-muted-foreground">
                     Showing {getFilteredData().orders.length} orders
                     {selectedDarkstore !== "all" && ` for ${selectedDarkstore}`}
+                    {selectedBrand !== "all" && ` (${selectedBrand})`}
+                    {(dateRange.start || dateRange.end) && ` in date range`}
                   </div>
                 </div>
                 <OrderDetailsView 
