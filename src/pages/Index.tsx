@@ -95,15 +95,16 @@ const Index = () => {
       setIsConnected(false);
       setIsLoading(true);
       
-      console.log('🔄 Connecting to published Google Sheets CSV...');
+      console.log('🔄 Starting Google Sheets connection...');
       
       // Try the published CSV link first
       let csvText = '';
       let foundValidSheet = false;
       
       try {
-        console.log('📊 Fetching from published CSV link...');
         const publishedUrl = `https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv&t=${Date.now()}`;
+        
+        console.log('📊 Fetching from URL:', publishedUrl);
         
         const response = await fetch(publishedUrl, {
           method: 'GET',
@@ -117,24 +118,40 @@ const Index = () => {
           cache: 'no-store'
         });
         
+        console.log('📊 Response status:', response.status, response.statusText);
+        console.log('📊 Response headers:', Object.fromEntries(response.headers.entries()));
+        
         if (response.ok) {
           csvText = await response.text();
-          console.log('📊 Published CSV response:', csvText.substring(0, 300));
+          console.log('📊 Raw CSV data length:', csvText.length);
+          console.log('📊 First 500 characters of CSV:', csvText.substring(0, 500));
+          console.log('📊 Last 500 characters of CSV:', csvText.substring(csvText.length - 500));
           
-          if (csvText && csvText.includes(',') && csvText.split('\n').length > 2) {
+          if (csvText && csvText.trim().length > 10 && csvText.includes(',')) {
             foundValidSheet = true;
-            console.log('✅ Found valid data from published CSV');
+            console.log('✅ Valid CSV data found from published sheet');
+          } else {
+            console.log('❌ CSV data appears invalid or empty');
           }
         } else {
-          console.log('Published CSV request failed:', response.status, response.statusText);
+          console.log('❌ HTTP error:', response.status, response.statusText);
         }
       } catch (publishedError) {
-        console.log('Published CSV fetch failed:', publishedError);
+        console.error('❌ Published CSV fetch failed:', publishedError);
       }
       
-      // Fallback: If published CSV didn't work, use sample data
+      // If published CSV didn't work, use sample data as fallback
       if (!foundValidSheet) {
-        console.log('📋 Using sample data fallback...');
+        console.log('❌ USING SAMPLE DATA FALLBACK - Real sheet data not accessible');
+        console.log('🔍 This means your Google Sheets data is NOT being loaded');
+        console.log('💡 Check: 1) Sheet is published to web, 2) Correct GID, 3) No access restrictions');
+        
+        // Force an error to make it obvious we're using sample data
+        toast({
+          variant: "destructive",
+          title: "Using Sample Data",
+          description: "Google Sheets connection failed. Dashboard shows sample data only.",
+        });
 csvText = `Darkstore Name,Brand Name,Created At,Import At,Assigned At,Confirmed At,Printed At,Manifest At
 Andheri,Myntra,8/1/2025 10:20:00 AM,8/1/2025 10:29:00 AM,8/1/2025 10:31:00 AM,8/1/2025 10:40:00 AM,8/1/2025 10:50:00 AM,8/1/2025 10:55:00 AM
 Andheri,Myntra,8/2/2025 9:20:00 AM,8/2/2025 10:29:00 AM,8/2/2025 10:31:00 AM,8/2/2025 10:40:00 AM,8/2/2025 10:50:00 AM,8/2/2025 10:55:00 AM
