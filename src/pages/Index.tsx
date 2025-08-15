@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import Papa from "papaparse";
+import { Card } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { StatusBar } from "@/components/dashboard/StatusBar";
 import { MetricsOverview } from "@/components/dashboard/MetricsOverview";
@@ -54,6 +55,7 @@ interface DashboardData {
 
 const Index = () => {
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData>({
     orders: [],
@@ -90,28 +92,53 @@ const Index = () => {
     try {
       const targetSheetId = newSheetId || sheetId;
       setIsConnected(false);
+      setIsLoading(true);
       
-      console.log('Connecting to Google Sheets with ID:', targetSheetId);
+      console.log('🔄 Connecting to Google Sheets with ID:', targetSheetId);
+      console.log('📊 Looking for Speed_Metric_Data subsheet...');
       
-      // Use the direct CSV export URL for Google Sheets
-      const sheetName = 'speed_metric_data';
-      const response = await fetch(
-        `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=0`,
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'text/csv',
+      // Use the direct CSV export URL for Google Sheets targeting Speed_Metric_Data subsheet
+      // Based on the spreadsheet structure, we need to find the correct GID for Speed_Metric_Data
+      // For now, let's try common GIDs - if this fails, we'll need the exact GID from the sheet URL
+      const possibleGids = ['1630699387', '1440123577', '0', '1', '2']; // Common GIDs to try
+      let response;
+      let csvText = '';
+      
+      for (const gid of possibleGids) {
+        try {
+          console.log(`Trying GID: ${gid}`);
+          response = await fetch(
+            `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=${gid}`,
+            {
+              method: 'GET',
+              headers: {
+                'Accept': 'text/csv',
+              }
+            }
+          );
+          
+          if (response.ok) {
+            const testCsvText = await response.text();
+            console.log(`GID ${gid} CSV preview:`, testCsvText.substring(0, 200));
+            
+            // Check if this looks like our target data (contains expected columns)
+            if (testCsvText.includes('Darkstore Name') && testCsvText.includes('Brand Name') && testCsvText.includes('Created At')) {
+              csvText = testCsvText;
+              console.log(`Found correct sheet with GID: ${gid}`);
+              break;
+            }
           }
+        } catch (e) {
+          console.log(`Failed with GID ${gid}:`, e);
+          continue;
         }
-      );
+      }
       
-      if (!response.ok) {
-        console.error('Failed to fetch from Google Sheets:', response.status, response.statusText);
-        throw new Error(`Failed to connect to Google Sheets. Status: ${response.status}. Please check the Sheet ID and ensure the sheet is publicly accessible.`);
+      if (!csvText) {
+        throw new Error(`Could not find Speed_Metric_Data sheet. Please ensure the sheet exists and is named correctly. Tried GIDs: ${possibleGids.join(', ')}`);
       }
 
-      const csvText = await response.text();
-      console.log('CSV data received:', csvText.substring(0, 200) + '...');
+      console.log('Final CSV data received:', csvText.substring(0, 200) + '...');
       
       if (!csvText || csvText.trim().length === 0) {
         throw new Error('No data received from Google Sheets. Please check if the sheet contains data.');
@@ -129,7 +156,18 @@ const Index = () => {
       setBrands(uniqueBrands);
 
       setIsConnected(true);
+      setIsLoading(false);
       setLastUpdate(new Date());
+      
+      console.log('✅ Successfully connected! Data summary:', {
+        totalOrders: processedData.orders.length,
+        uniqueDarkstores: uniqueDarkstores.length,
+        uniqueBrands: uniqueBrands.length,
+        dateRange: processedData.orders.length > 0 ? {
+          earliest: processedData.orders[0]?.createdAt,
+          latest: processedData.orders[processedData.orders.length - 1]?.createdAt
+        } : null
+      });
       
       toast({
         title: "Connected Successfully",
@@ -137,8 +175,9 @@ const Index = () => {
       });
       
     } catch (error) {
-      console.error('Connection error:', error);
+      console.error('❌ Connection error:', error);
       setIsConnected(false);
+      setIsLoading(false);
       toast({
         variant: "destructive",
         title: "Connection Failed",
@@ -166,38 +205,48 @@ const Index = () => {
       const processedOrders: OrderData[] = rawData
         .filter(row => row['Created At'] && row['Import At']) // Filter out incomplete rows
         .map((row, index) => {
-          // Parse dates - handle multiple possible formats
+          // Parse dates - handle the specific format: M/D/YYYY H:mm:ss AM/PM
           const parseDate = (dateStr: string): Date => {
             if (!dateStr || dateStr.trim() === '') return new Date();
             
-            // Try multiple date formats
-            const formats = [
-              // ISO format
-              () => new Date(dateStr),
-              // MM/DD/YYYY HH:mm:ss
-              () => new Date(dateStr.replace(/(\d{1,2})\/(\d{1,2})\/(\d{4})/, '$3-$1-$2')),
-              // DD/MM/YYYY HH:mm:ss
-              () => {
-                const parts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})\s*(.*)/) || [];
-                if (parts.length >= 4) {
-                  const [, day, month, year, time] = parts;
-                  return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')} ${time || '00:00:00'}`);
+            try {
+              // Handle the specific format from your data: M/D/YYYY H:mm:ss AM/PM
+              // Example: "8/1/2025 10:20:00 AM"
+              const dateTimeRegex = /^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2}):(\d{2})\s+(AM|PM)$/i;
+              const match = dateStr.trim().match(dateTimeRegex);
+              
+              if (match) {
+                const [, month, day, year, hour, minute, second, ampm] = match;
+                let hour24 = parseInt(hour);
+                
+                // Convert to 24-hour format
+                if (ampm.toUpperCase() === 'PM' && hour24 !== 12) {
+                  hour24 += 12;
+                } else if (ampm.toUpperCase() === 'AM' && hour24 === 12) {
+                  hour24 = 0;
                 }
-                return new Date(dateStr);
+                
+                const isoString = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T${hour24.toString().padStart(2, '0')}:${minute}:${second}`;
+                const date = new Date(isoString);
+                
+                if (!isNaN(date.getTime())) {
+                  console.log(`Parsed date: ${dateStr} -> ${date.toISOString()}`);
+                  return date;
+                }
               }
-            ];
-            
-            for (const format of formats) {
-              try {
-                const date = format();
-                if (!isNaN(date.getTime())) return date;
-              } catch (e) {
-                continue;
+              
+              // Fallback to standard Date parsing
+              const fallbackDate = new Date(dateStr);
+              if (!isNaN(fallbackDate.getTime())) {
+                return fallbackDate;
               }
+              
+              console.warn(`Could not parse date: ${dateStr}`);
+              return new Date();
+            } catch (e) {
+              console.warn(`Error parsing date ${dateStr}:`, e);
+              return new Date();
             }
-            
-            console.warn(`Could not parse date: ${dateStr}`);
-            return new Date();
           };
 
           const createdAt = parseDate(row['Created At'] || '');
@@ -394,6 +443,16 @@ const Index = () => {
           lastUpdate={lastUpdate}
           onRefresh={() => connectToSheet()}
         />
+        
+        {/* Loading State */}
+        {isLoading && (
+          <Card className="p-8 text-center">
+            <div className="flex items-center justify-center space-x-2">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              <span className="text-muted-foreground">Loading dashboard data...</span>
+            </div>
+          </Card>
+        )}
         
         {/* Filters Section */}
         {(darkstores.length > 0 || brands.length > 0) && (

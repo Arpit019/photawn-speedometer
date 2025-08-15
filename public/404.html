@@ -6,17 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Photawn Speed Dashboard</title>
     <script>
-      // GitHub Pages SPA redirect - store the current path
-      var pathSegmentsToKeep = 1;
-      var l = window.location;
-      l.replace(
-        l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + 
-        '/?/' +
-        l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash
-      );
+      // GitHub Pages SPA redirect for photawn-speedometer
+      // Store the current path and redirect to index with encoded path
+      var redirect = sessionStorage.redirect;
+      if (!redirect) {
+        var l = window.location;
+        var indexPage = l.origin + '/photawn-speedometer/';
+        
+        // Store the path for the main app to handle
+        sessionStorage.redirect = l.href;
+        
+        // Redirect to the main index page
+        l.replace(indexPage);
+      }
     </script>
   </head>
   <body>
