@@ -446,12 +446,12 @@ const Index = () => {
         
         {/* Loading State */}
         {isLoading && (
-          <Card className="p-8 text-center">
+          <div className="p-8 text-center rounded-lg border bg-card text-card-foreground shadow-sm">
             <div className="flex items-center justify-center space-x-2">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
               <span className="text-muted-foreground">Loading dashboard data...</span>
             </div>
-          </Card>
+          </div>
         )}
         
         {/* Filters Section */}
