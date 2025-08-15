@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 interface MetricBucket {
   range: string;
@@ -25,11 +25,43 @@ const COLORS = {
 };
 
 export const ChartsSection = ({ metrics }: ChartsSectionProps) => {
-  // Transform metrics data for charts
-  const timeDistributionData = [
-    { name: '0-15 mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[0]?.count || 0), 0) },
-    { name: '15-25 mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[1]?.count || 0), 0) },
-    { name: '25+ mins', value: Object.values(metrics).reduce((sum, metric) => sum + (metric[2]?.count || 0), 0) }
+  // Transform metrics data for charts - create flow data showing processing stages
+  const processFlowData = [
+    { 
+      stage: 'Import', 
+      fast: metrics.importCutoff[0]?.count || 0,
+      medium: metrics.importCutoff[1]?.count || 0,
+      slow: metrics.importCutoff[2]?.count || 0,
+      total: (metrics.importCutoff[0]?.count || 0) + (metrics.importCutoff[1]?.count || 0) + (metrics.importCutoff[2]?.count || 0)
+    },
+    { 
+      stage: 'Inventory', 
+      fast: metrics.inventoryAssign[0]?.count || 0,
+      medium: metrics.inventoryAssign[1]?.count || 0,
+      slow: metrics.inventoryAssign[2]?.count || 0,
+      total: (metrics.inventoryAssign[0]?.count || 0) + (metrics.inventoryAssign[1]?.count || 0) + (metrics.inventoryAssign[2]?.count || 0)
+    },
+    { 
+      stage: 'Batch/Pick', 
+      fast: metrics.batchPick[0]?.count || 0,
+      medium: metrics.batchPick[1]?.count || 0,
+      slow: metrics.batchPick[2]?.count || 0,
+      total: (metrics.batchPick[0]?.count || 0) + (metrics.batchPick[1]?.count || 0) + (metrics.batchPick[2]?.count || 0)
+    },
+    { 
+      stage: 'Label', 
+      fast: metrics.labelPrint[0]?.count || 0,
+      medium: metrics.labelPrint[1]?.count || 0,
+      slow: metrics.labelPrint[2]?.count || 0,
+      total: (metrics.labelPrint[0]?.count || 0) + (metrics.labelPrint[1]?.count || 0) + (metrics.labelPrint[2]?.count || 0)
+    },
+    { 
+      stage: 'Pickup', 
+      fast: metrics.pickupCutoff[0]?.count || 0,
+      medium: metrics.pickupCutoff[1]?.count || 0,
+      slow: metrics.pickupCutoff[2]?.count || 0,
+      total: (metrics.pickupCutoff[0]?.count || 0) + (metrics.pickupCutoff[1]?.count || 0) + (metrics.pickupCutoff[2]?.count || 0)
+    }
   ];
 
   const metricComparisonData = [
@@ -47,38 +79,76 @@ export const ChartsSection = ({ metrics }: ChartsSectionProps) => {
         <Card className="chart-container">
           <CardHeader>
             <CardTitle className="text-lg font-semibold text-foreground">
-              Overall Time Distribution
+              Processing Flow Analysis
             </CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={timeDistributionData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {timeDistributionData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={COLORS.distribution[index % COLORS.distribution.length]} 
-                    />
-                  ))}
-                </Pie>
+              <AreaChart data={processFlowData}>
+                <defs>
+                  <linearGradient id="fastGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="mediumGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--warning))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--warning))" stopOpacity={0.1}/>
+                  </linearGradient>
+                  <linearGradient id="slowGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--error))" stopOpacity={0.8}/>
+                    <stop offset="95%" stopColor="hsl(var(--error))" stopOpacity={0.1}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis 
+                  dataKey="stage" 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
+                <YAxis 
+                  stroke="hsl(var(--muted-foreground))"
+                  fontSize={12}
+                  tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                />
                 <Tooltip 
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     border: '1px solid hsl(var(--card-border))',
                     borderRadius: '8px',
-                    color: 'hsl(var(--card-foreground))'
+                    color: 'hsl(var(--card-foreground))',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
                   }}
+                  labelStyle={{ color: 'hsl(var(--foreground))' }}
                 />
-              </PieChart>
+                <Area 
+                  type="monotone" 
+                  dataKey="fast" 
+                  stackId="1" 
+                  stroke="hsl(var(--success))" 
+                  fill="url(#fastGradient)"
+                  strokeWidth={2}
+                  name="0-15 mins (Fast)"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="medium" 
+                  stackId="1" 
+                  stroke="hsl(var(--warning))" 
+                  fill="url(#mediumGradient)"
+                  strokeWidth={2}
+                  name="15-25 mins (Medium)"
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="slow" 
+                  stackId="1" 
+                  stroke="hsl(var(--error))" 
+                  fill="url(#slowGradient)"
+                  strokeWidth={2}
+                  name="25+ mins (Slow)"
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
