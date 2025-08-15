@@ -84,9 +84,9 @@ const Index = () => {
       const targetSheetId = newSheetId || sheetId;
       setIsConnected(false);
       
-      // Simulate Google Sheets connection and data processing
+      // Connect to the specific speed_metric_data sheet
       const response = await fetch(
-        `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=0`
+        `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=speed_metric_data`
       );
       
       if (!response.ok) {
@@ -138,7 +138,7 @@ const Index = () => {
       
       // Process each row into OrderData format
       const processedOrders: OrderData[] = rawData
-        .filter(row => row['Created Date'] && row['Import Date']) // Filter out incomplete rows
+        .filter(row => row['Created At'] && row['Import At']) // Filter out incomplete rows
         .map((row, index) => {
           // Parse dates - handle multiple possible formats
           const parseDate = (dateStr: string): Date => {
@@ -174,12 +174,12 @@ const Index = () => {
             return new Date();
           };
 
-          const createdAt = parseDate(row['Created Date'] || row['Created At'] || '');
-          const importAt = parseDate(row['Import Date'] || row['Import At'] || '');
-          const assignedAt = parseDate(row['Assigned At'] || row['Assigned Date'] || '');
-          const confirmedAt = parseDate(row['Confirmed At'] || row['Confirmed Date'] || '');
-          const printedAt = parseDate(row['Printed At'] || row['Printed Date'] || '');
-          const manifestAt = parseDate(row['Manifest At'] || row['Manifest Date'] || '');
+          const createdAt = parseDate(row['Created At'] || '');
+          const importAt = parseDate(row['Import At'] || '');
+          const assignedAt = parseDate(row['Assigned At'] || '');
+          const confirmedAt = parseDate(row['Confirmed At'] || '');
+          const printedAt = parseDate(row['Printed At'] || '');
+          const manifestAt = parseDate(row['Manifest At'] || '');
 
           // Calculate time differences in minutes
           const importCutoff = Math.max(0, Math.round((importAt.getTime() - createdAt.getTime()) / (1000 * 60)));
@@ -190,8 +190,8 @@ const Index = () => {
 
           return {
             id: row['Order ID'] || row['ID'] || `ORD-${String(index + 1).padStart(4, '0')}`,
-            darkstoreName: row['Darkstore Name'] || row['Dark Store'] || row['Store Name'] || 'Unknown Store',
-            brandName: row['Brand Name'] || row['Brand'] || 'Unknown Brand',
+            darkstoreName: row['Darkstore Name'] || 'Unknown Store',
+            brandName: row['Brand Name'] || 'Unknown Brand',
             createdAt,
             importAt,
             assignedAt,
