@@ -84,18 +84,34 @@ const Index = () => {
       const targetSheetId = newSheetId || sheetId;
       setIsConnected(false);
       
-      // Connect to the specific speed_metric_data sheet
+      console.log('Connecting to Google Sheets with ID:', targetSheetId);
+      
+      // Use the correct sheet name format for Google Sheets export
+      const sheetName = 'speed_metric_data';
       const response = await fetch(
-        `https://docs.google.com/spreadsheets/d/${targetSheetId}/export?format=csv&gid=speed_metric_data`
+        `https://docs.google.com/spreadsheets/d/${targetSheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/csv',
+          }
+        }
       );
       
       if (!response.ok) {
-        throw new Error('Failed to connect to Google Sheets. Please check the Sheet ID and permissions.');
+        console.error('Failed to fetch from Google Sheets:', response.status, response.statusText);
+        throw new Error(`Failed to connect to Google Sheets. Status: ${response.status}. Please check the Sheet ID and ensure the sheet is publicly accessible.`);
       }
 
-      // Simulate CSV parsing and data processing
       const csvText = await response.text();
+      console.log('CSV data received:', csvText.substring(0, 200) + '...');
+      
+      if (!csvText || csvText.trim().length === 0) {
+        throw new Error('No data received from Google Sheets. Please check if the sheet contains data.');
+      }
+      
       const processedData = processSheetData(csvText);
+      console.log('Processed data:', processedData);
       
       setDashboardData(processedData);
       
@@ -108,10 +124,11 @@ const Index = () => {
       
       toast({
         title: "Connected Successfully",
-        description: "Dashboard data has been updated from Google Sheets.",
+        description: `Dashboard updated with ${processedData.orders.length} orders from Google Sheets.`,
       });
       
     } catch (error) {
+      console.error('Connection error:', error);
       setIsConnected(false);
       toast({
         variant: "destructive",
@@ -318,17 +335,24 @@ const Index = () => {
   };
 
   useEffect(() => {
-    // Auto-connect on load
-    connectToSheet();
+    // Auto-connect on load with a small delay to ensure component is mounted
+    const timer = setTimeout(() => {
+      console.log('Auto-connecting to Google Sheets...');
+      connectToSheet();
+    }, 1000);
     
     // Set up auto-refresh every 5 minutes
     const interval = setInterval(() => {
       if (isConnected) {
+        console.log('Auto-refreshing data...');
         connectToSheet();
       }
     }, 5 * 60 * 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
