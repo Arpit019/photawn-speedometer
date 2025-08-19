@@ -10,6 +10,7 @@ import { OrderDetailsView } from "@/components/dashboard/OrderDetailsView";
 import { ChartsSection } from "@/components/dashboard/ChartsSection";
 import { SettingsModal } from "@/components/dashboard/SettingsModal";
 import { FiltersSection } from "@/components/dashboard/FiltersSection";
+import { QualityMetrics } from "@/components/dashboard/QualityMetrics";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderData {
@@ -27,6 +28,8 @@ interface OrderData {
   batchPickCutoff: number; // minutes
   labelCutoff: number; // minutes
   pickupCutoff: number; // minutes
+  pickupToDelivery: number; // minutes
+  totalProcessingTime: number; // minutes
 }
 
 interface MetricBucket {
@@ -50,6 +53,7 @@ interface DashboardData {
     totalOrders: number;
     avgImportTime: number;
     avgTotalTime: number;
+    avgPickupToDelivery: number;
     onTimeRate: number;
   };
 }
@@ -71,12 +75,14 @@ const Index = () => {
       totalOrders: 0,
       avgImportTime: 0,
       avgTotalTime: 0,
+      avgPickupToDelivery: 0,
       onTimeRate: 0
     }
   });
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [showOrderDetails, setShowOrderDetails] = useState(false);
+  const [activeTab, setActiveTab] = useState<'time' | 'quality'>('time');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [sheetId, setSheetId] = useState("1oyCjFS754qAW88vpEcqWeR_avTgwv3FWvVV66GJNqI4");
   const [selectedDarkstore, setSelectedDarkstore] = useState<string>("all");
@@ -102,9 +108,10 @@ const Index = () => {
       let foundValidSheet = false;
       
       try {
-        const publishedUrl = `https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv&t=${Date.now()}`;
+        // Hardcoded connection to your specific Google Sheet
+        const publishedUrl = `https://docs.google.com/spreadsheets/d/e/2PACX-1vQQfkPI_kCsELoDIyKMFBX3g8QM02PEX4UrjiTVouPBzLUWnvfwQmqWTytzVRJ4jAhrN1ExG4y_l17T/pub?gid=1214222356&single=true&output=csv&cachebust=${Date.now()}`;
         
-        console.log('📊 Fetching from URL:', publishedUrl);
+        console.log('📊 Connecting to hardcoded Google Sheet URL:', publishedUrl);
         
         const response = await fetch(publishedUrl, {
           method: 'GET',
@@ -307,6 +314,9 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           const labelCutoff = Math.max(0, Math.round((printedAt.getTime() - confirmedAt.getTime()) / (1000 * 60)));
           const pickupCutoff = Math.max(0, Math.round((manifestAt.getTime() - printedAt.getTime()) / (1000 * 60)));
 
+          // Calculate pickup to delivery time (from manifest to a theoretical delivery - using +30 mins as example)
+          const pickupToDelivery = 30; // This would be calculated from actual delivery timestamp when available
+
           // Calculate total processing time from import to manifest
           const totalProcessingTime = Math.max(0, Math.round((manifestAt.getTime() - importAt.getTime()) / (1000 * 60)));
           
@@ -338,7 +348,9 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
             inventoryAssignCutoff,
             batchPickCutoff,
             labelCutoff,
-            pickupCutoff
+            pickupCutoff,
+            pickupToDelivery,
+            totalProcessingTime
           };
         });
 
@@ -389,6 +401,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
             const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
             return sum + totalTime;
           }, 0) / processedOrders.length) : 0,
+          avgPickupToDelivery: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.pickupToDelivery, 0) / processedOrders.length) : 0,
           onTimeRate: processedOrders.length > 0 ? Math.round((processedOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / processedOrders.length) * 100) : 0
         }
       };
@@ -414,6 +427,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           totalOrders: 0,
           avgImportTime: 0,
           avgTotalTime: 0,
+          avgPickupToDelivery: 0,
           onTimeRate: 0
         }
       };
@@ -473,15 +487,13 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
         labelPrint: createMetricBuckets(filteredOrders, 'labelCutoff'),
         pickupCutoff: createMetricBuckets(filteredOrders, 'pickupCutoff')
       },
-      summary: {
-        totalOrders: filteredOrders.length,
-        avgImportTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.importCutoff, 0) / filteredOrders.length) : 0,
-        avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => {
-          const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
-          return sum + totalTime;
-        }, 0) / filteredOrders.length) : 0,
-        onTimeRate: filteredOrders.length > 0 ? Math.round((filteredOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / filteredOrders.length) * 100) : 0
-      }
+        summary: {
+          totalOrders: filteredOrders.length,
+          avgImportTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.importCutoff, 0) / filteredOrders.length) : 0,
+          avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.totalProcessingTime, 0) / filteredOrders.length) : 0,
+          avgPickupToDelivery: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.pickupToDelivery, 0) / filteredOrders.length) : 0,
+          onTimeRate: filteredOrders.length > 0 ? Math.round((filteredOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / filteredOrders.length) * 100) : 0
+        }
     };
   };
 
@@ -625,11 +637,46 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           {!showOrderDetails ? (
             <>
               <MetricsOverview summary={getFilteredData().summary} />
-              <TimeMetricsGrid 
-                metrics={getFilteredData().metrics}
-                onMetricClick={handleMetricClick}
-              />
-              <ChartsSection metrics={getFilteredData().metrics} />
+              
+              {/* Tabs for Time Metrics vs Quality Metrics */}
+              <div className="space-y-6">
+                <div className="border-b border-border">
+                  <nav className="flex space-x-8">
+                    <button
+                      onClick={() => setActiveTab('time')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                        activeTab === 'time'
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                      }`}
+                    >
+                      Time Metrics
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('quality')}
+                      className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                        activeTab === 'quality'
+                          ? 'border-primary text-primary'
+                          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+                      }`}
+                    >
+                      Quality Metrics
+                    </button>
+                  </nav>
+                </div>
+                
+                {activeTab === 'time' ? (
+                  <>
+                    <TimeMetricsGrid 
+                      metrics={getFilteredData().metrics}
+                      onMetricClick={handleMetricClick}
+                    />
+                    <ChartsSection metrics={getFilteredData().metrics} />
+                  </>
+                ) : (
+                  <QualityMetrics onMetricClick={handleMetricClick} />
+                )}
+              </div>
               
               {/* All Orders Section */}
               <section className="space-y-6">

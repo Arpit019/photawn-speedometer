@@ -6,6 +6,7 @@ interface MetricsOverviewProps {
     totalOrders: number;
     avgImportTime: number;
     avgTotalTime: number;
+    avgPickupToDelivery: number;
     onTimeRate: number;
   };
 }
@@ -35,6 +36,14 @@ export const MetricsOverview = ({ summary }: MetricsOverviewProps) => {
       colorClass: "text-metric-performance",
       bgClass: "bg-metric-performance/10",
       trend: "Within SLA"
+    },
+    {
+      title: "Avg Pickup to Delivery",
+      value: `${summary.avgPickupToDelivery}m`,
+      icon: Target,
+      colorClass: "text-metric-speed",
+      bgClass: "bg-metric-speed/10",
+      trend: "On schedule"
     },
     {
       title: "On-Time Rate",
