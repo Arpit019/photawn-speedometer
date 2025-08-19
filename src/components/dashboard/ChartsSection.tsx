@@ -13,6 +13,7 @@ interface TimeMetrics {
   batchPick: MetricBucket[];
   labelPrint: MetricBucket[];
   pickupCutoff: MetricBucket[];
+  deliveryCutoff: MetricBucket[];
 }
 
 interface ChartsSectionProps {
@@ -61,6 +62,13 @@ export const ChartsSection = ({ metrics }: ChartsSectionProps) => {
       medium: metrics.pickupCutoff[1]?.count || 0,
       slow: metrics.pickupCutoff[2]?.count || 0,
       total: (metrics.pickupCutoff[0]?.count || 0) + (metrics.pickupCutoff[1]?.count || 0) + (metrics.pickupCutoff[2]?.count || 0)
+    },
+    { 
+      stage: 'Delivery', 
+      fast: metrics.deliveryCutoff[0]?.count || 0,
+      medium: metrics.deliveryCutoff[1]?.count || 0,
+      slow: metrics.deliveryCutoff[2]?.count || 0,
+      total: (metrics.deliveryCutoff[0]?.count || 0) + (metrics.deliveryCutoff[1]?.count || 0) + (metrics.deliveryCutoff[2]?.count || 0)
     }
   ];
 
@@ -69,7 +77,8 @@ export const ChartsSection = ({ metrics }: ChartsSectionProps) => {
     { name: 'Inventory', fast: metrics.inventoryAssign[0]?.count || 0, medium: metrics.inventoryAssign[1]?.count || 0, slow: metrics.inventoryAssign[2]?.count || 0 },
     { name: 'Batch/Pick', fast: metrics.batchPick[0]?.count || 0, medium: metrics.batchPick[1]?.count || 0, slow: metrics.batchPick[2]?.count || 0 },
     { name: 'Label', fast: metrics.labelPrint[0]?.count || 0, medium: metrics.labelPrint[1]?.count || 0, slow: metrics.labelPrint[2]?.count || 0 },
-    { name: 'Pickup', fast: metrics.pickupCutoff[0]?.count || 0, medium: metrics.pickupCutoff[1]?.count || 0, slow: metrics.pickupCutoff[2]?.count || 0 }
+    { name: 'Pickup', fast: metrics.pickupCutoff[0]?.count || 0, medium: metrics.pickupCutoff[1]?.count || 0, slow: metrics.pickupCutoff[2]?.count || 0 },
+    { name: 'Delivery', fast: metrics.deliveryCutoff[0]?.count || 0, medium: metrics.deliveryCutoff[1]?.count || 0, slow: metrics.deliveryCutoff[2]?.count || 0 }
   ];
 
   return (

@@ -15,6 +15,7 @@ interface TimeMetrics {
   batchPick: MetricBucket[];
   labelPrint: MetricBucket[];
   pickupCutoff: MetricBucket[];
+  deliveryCutoff: MetricBucket[];
 }
 
 interface TimeMetricsGridProps {
@@ -63,6 +64,14 @@ export const TimeMetricsGrid = ({ metrics, onMetricClick }: TimeMetricsGridProps
       icon: Truck,
       colorClass: 'text-red-500',
       bgClass: 'bg-red-500/10'
+    },
+    {
+      key: 'deliveryCutoff',
+      title: 'Delivery Cutoff Time',
+      description: 'Delivered At - Pickup At',
+      icon: Package,
+      colorClass: 'text-indigo-500',
+      bgClass: 'bg-indigo-500/10'
     }
   ];
 

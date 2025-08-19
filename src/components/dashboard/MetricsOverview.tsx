@@ -5,9 +5,11 @@ interface MetricsOverviewProps {
   summary: {
     totalOrders: number;
     avgImportTime: number;
-    avgTotalTime: number;
-    avgPickupToDelivery: number;
-    onTimeRate: number;
+    avgInventoryAssignTime: number;
+    avgPickupAndBatchTime: number;
+    avgLabelCutoffTime: number;
+    avgPickupCutoffTime: number;
+    avgDeliveryCutoffTime: number;
   };
 }
 
@@ -30,35 +32,51 @@ export const MetricsOverview = ({ summary }: MetricsOverviewProps) => {
       trend: "-3m from target"
     },
     {
-      title: "Avg Total Time",
-      value: `${summary.avgTotalTime}m`,
-      icon: Zap,
+      title: "Avg Inventory Assign Time",
+      value: `${summary.avgInventoryAssignTime}m`,
+      icon: Target,
       colorClass: "text-metric-performance",
       bgClass: "bg-metric-performance/10",
       trend: "Within SLA"
     },
     {
-      title: "Avg Pickup to Delivery",
-      value: `${summary.avgPickupToDelivery}m`,
+      title: "Avg Pickup & Batch Time",
+      value: `${summary.avgPickupAndBatchTime}m`,
+      icon: Zap,
+      colorClass: "text-metric-compliance",
+      bgClass: "bg-metric-compliance/10",
+      trend: "Optimal"
+    },
+    {
+      title: "Avg Label Cutoff Time",
+      value: `${summary.avgLabelCutoffTime}m`,
       icon: Target,
       colorClass: "text-metric-speed",
       bgClass: "bg-metric-speed/10",
-      trend: "On schedule"
+      trend: "On target"
     },
     {
-      title: "On-Time Rate",
-      value: `${summary.onTimeRate}%`,
-      icon: Target,
-      colorClass: "text-metric-compliance",
-      bgClass: "bg-metric-compliance/10",
-      trend: "+5% improvement"
+      title: "Avg Pickup Cutoff Time",
+      value: `${summary.avgPickupCutoffTime}m`,
+      icon: Clock,
+      colorClass: "text-metric-efficiency",
+      bgClass: "bg-metric-efficiency/10",
+      trend: "Improving"
+    },
+    {
+      title: "Avg Delivery Cutoff Time",
+      value: `${summary.avgDeliveryCutoffTime}m`,
+      icon: TrendingUp,
+      colorClass: "text-metric-performance",
+      bgClass: "bg-metric-performance/10",
+      trend: "On schedule"
     }
   ];
 
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-semibold text-foreground gradient-text">Performance Overview</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (

@@ -11,6 +11,8 @@ import { ChartsSection } from "@/components/dashboard/ChartsSection";
 import { SettingsModal } from "@/components/dashboard/SettingsModal";
 import { FiltersSection } from "@/components/dashboard/FiltersSection";
 import { QualityMetrics } from "@/components/dashboard/QualityMetrics";
+import { QualityDashboard } from "@/components/dashboard/QualityDashboard";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 
 interface OrderData {
@@ -28,6 +30,7 @@ interface OrderData {
   batchPickCutoff: number; // minutes
   labelCutoff: number; // minutes
   pickupCutoff: number; // minutes
+  deliveryCutoff: number; // minutes
   pickupToDelivery: number; // minutes
   totalProcessingTime: number; // minutes
 }
@@ -44,6 +47,7 @@ interface TimeMetrics {
   batchPick: MetricBucket[];
   labelPrint: MetricBucket[];
   pickupCutoff: MetricBucket[];
+  deliveryCutoff: MetricBucket[];
 }
 
 interface DashboardData {
@@ -52,9 +56,11 @@ interface DashboardData {
   summary: {
     totalOrders: number;
     avgImportTime: number;
-    avgTotalTime: number;
-    avgPickupToDelivery: number;
-    onTimeRate: number;
+    avgInventoryAssignTime: number;
+    avgPickupAndBatchTime: number;
+    avgLabelCutoffTime: number;
+    avgPickupCutoffTime: number;
+    avgDeliveryCutoffTime: number;
   };
 }
 
@@ -69,14 +75,17 @@ const Index = () => {
       inventoryAssign: [],
       batchPick: [],
       labelPrint: [],
-      pickupCutoff: []
+      pickupCutoff: [],
+      deliveryCutoff: []
     },
     summary: {
       totalOrders: 0,
       avgImportTime: 0,
-      avgTotalTime: 0,
-      avgPickupToDelivery: 0,
-      onTimeRate: 0
+      avgInventoryAssignTime: 0,
+      avgPickupAndBatchTime: 0,
+      avgLabelCutoffTime: 0,
+      avgPickupCutoffTime: 0,
+      avgDeliveryCutoffTime: 0
     }
   });
   const [selectedMetric, setSelectedMetric] = useState<string | null>(null);
@@ -316,6 +325,9 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
 
           // Calculate pickup to delivery time (from manifest to a theoretical delivery - using +30 mins as example)
           const pickupToDelivery = 30; // This would be calculated from actual delivery timestamp when available
+          
+          // Calculate delivery cutoff time (delivered at minus pickup at - using sample 30 mins)
+          const deliveryCutoff = pickupToDelivery; // This would be actual delivery time - manifest time
 
           // Calculate total processing time from import to manifest
           const totalProcessingTime = Math.max(0, Math.round((manifestAt.getTime() - importAt.getTime()) / (1000 * 60)));
@@ -349,6 +361,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
             batchPickCutoff,
             labelCutoff,
             pickupCutoff,
+            deliveryCutoff,
             pickupToDelivery,
             totalProcessingTime
           };
@@ -360,7 +373,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       return '25+ mins';
     };
 
-    const createMetricBuckets = (orders: OrderData[], metricKey: keyof Pick<OrderData, 'importCutoff' | 'inventoryAssignCutoff' | 'batchPickCutoff' | 'labelCutoff' | 'pickupCutoff'>): MetricBucket[] => {
+    const createMetricBuckets = (orders: OrderData[], metricKey: keyof Pick<OrderData, 'importCutoff' | 'inventoryAssignCutoff' | 'batchPickCutoff' | 'labelCutoff' | 'pickupCutoff' | 'deliveryCutoff'>): MetricBucket[] => {
       const buckets = ['0-15 mins', '15-25 mins', '25+ mins'];
       return buckets.map(range => ({
         range,
@@ -369,14 +382,23 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       }));
     };
 
+      // Calculate summary metrics
+      const avgImportTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0;
+      const avgInventoryAssignTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.inventoryAssignCutoff, 0) / processedOrders.length) : 0;
+      const avgPickupAndBatchTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.batchPickCutoff, 0) / processedOrders.length) : 0;
+      const avgLabelCutoffTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.labelCutoff, 0) / processedOrders.length) : 0;
+      const avgPickupCutoffTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.pickupCutoff, 0) / processedOrders.length) : 0;
+      const avgDeliveryCutoffTime = processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.deliveryCutoff, 0) / processedOrders.length) : 0;
+
       // Debug the final summary
       console.log('📊 Final processed summary:', {
         totalOrders: processedOrders.length,
-        avgImportTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0,
-        avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => {
-          const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
-          return sum + totalTime;
-        }, 0) / processedOrders.length) : 0,
+        avgImportTime,
+        avgInventoryAssignTime,
+        avgPickupAndBatchTime,
+        avgLabelCutoffTime,
+        avgPickupCutoffTime,
+        avgDeliveryCutoffTime,
         sampleTotalTimes: processedOrders.slice(0, 3).map(o => ({
           orderId: o.id,
           importAt: o.importAt.toISOString(),
@@ -392,17 +414,17 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           inventoryAssign: createMetricBuckets(processedOrders, 'inventoryAssignCutoff'),
           batchPick: createMetricBuckets(processedOrders, 'batchPickCutoff'),
           labelPrint: createMetricBuckets(processedOrders, 'labelCutoff'),
-          pickupCutoff: createMetricBuckets(processedOrders, 'pickupCutoff')
+          pickupCutoff: createMetricBuckets(processedOrders, 'pickupCutoff'),
+          deliveryCutoff: createMetricBuckets(processedOrders, 'deliveryCutoff')
         },
         summary: {
           totalOrders: processedOrders.length,
-          avgImportTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.importCutoff, 0) / processedOrders.length) : 0,
-          avgTotalTime: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => {
-            const totalTime = (o.manifestAt.getTime() - o.importAt.getTime()) / (1000 * 60);
-            return sum + totalTime;
-          }, 0) / processedOrders.length) : 0,
-          avgPickupToDelivery: processedOrders.length > 0 ? Math.round(processedOrders.reduce((sum, o) => sum + o.pickupToDelivery, 0) / processedOrders.length) : 0,
-          onTimeRate: processedOrders.length > 0 ? Math.round((processedOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / processedOrders.length) * 100) : 0
+          avgImportTime,
+          avgInventoryAssignTime,
+          avgPickupAndBatchTime,
+          avgLabelCutoffTime,
+          avgPickupCutoffTime,
+          avgDeliveryCutoffTime
         }
       };
     } catch (error) {
@@ -421,14 +443,17 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
           inventoryAssign: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }],
           batchPick: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }],
           labelPrint: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }],
-          pickupCutoff: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }]
+          pickupCutoff: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }],
+          deliveryCutoff: [{ range: '0-15 mins', count: 0, orders: [] }, { range: '15-25 mins', count: 0, orders: [] }, { range: '25+ mins', count: 0, orders: [] }]
         },
         summary: {
           totalOrders: 0,
           avgImportTime: 0,
-          avgTotalTime: 0,
-          avgPickupToDelivery: 0,
-          onTimeRate: 0
+          avgInventoryAssignTime: 0,
+          avgPickupAndBatchTime: 0,
+          avgLabelCutoffTime: 0,
+          avgPickupCutoffTime: 0,
+          avgDeliveryCutoffTime: 0
         }
       };
     }
@@ -463,7 +488,7 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
       });
     }
     
-    const createMetricBuckets = (orders: OrderData[], metricKey: keyof Pick<OrderData, 'importCutoff' | 'inventoryAssignCutoff' | 'batchPickCutoff' | 'labelCutoff' | 'pickupCutoff'>): MetricBucket[] => {
+    const createMetricBuckets = (orders: OrderData[], metricKey: keyof Pick<OrderData, 'importCutoff' | 'inventoryAssignCutoff' | 'batchPickCutoff' | 'labelCutoff' | 'pickupCutoff' | 'deliveryCutoff'>): MetricBucket[] => {
       const buckets = ['0-15 mins', '15-25 mins', '25+ mins'];
       const categorizeBucket = (time: number): string => {
         if (time <= 15) return '0-15 mins';
@@ -485,14 +510,17 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
         inventoryAssign: createMetricBuckets(filteredOrders, 'inventoryAssignCutoff'),
         batchPick: createMetricBuckets(filteredOrders, 'batchPickCutoff'),
         labelPrint: createMetricBuckets(filteredOrders, 'labelCutoff'),
-        pickupCutoff: createMetricBuckets(filteredOrders, 'pickupCutoff')
+        pickupCutoff: createMetricBuckets(filteredOrders, 'pickupCutoff'),
+        deliveryCutoff: createMetricBuckets(filteredOrders, 'deliveryCutoff')
       },
         summary: {
           totalOrders: filteredOrders.length,
           avgImportTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.importCutoff, 0) / filteredOrders.length) : 0,
-          avgTotalTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.totalProcessingTime, 0) / filteredOrders.length) : 0,
-          avgPickupToDelivery: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.pickupToDelivery, 0) / filteredOrders.length) : 0,
-          onTimeRate: filteredOrders.length > 0 ? Math.round((filteredOrders.filter(o => o.importCutoff <= 15 && o.inventoryAssignCutoff <= 15).length / filteredOrders.length) * 100) : 0
+          avgInventoryAssignTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.inventoryAssignCutoff, 0) / filteredOrders.length) : 0,
+          avgPickupAndBatchTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.batchPickCutoff, 0) / filteredOrders.length) : 0,
+          avgLabelCutoffTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.labelCutoff, 0) / filteredOrders.length) : 0,
+          avgPickupCutoffTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.pickupCutoff, 0) / filteredOrders.length) : 0,
+          avgDeliveryCutoffTime: filteredOrders.length > 0 ? Math.round(filteredOrders.reduce((sum, o) => sum + o.deliveryCutoff, 0) / filteredOrders.length) : 0
         }
     };
   };
@@ -518,112 +546,52 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
     return () => clearInterval(refreshInterval);
   }, [sheetId]);
 
+  const handleQualityMetricClick = (metricType: string, bucketRange: string) => {
+    // Handle quality metric clicks - for now just log them
+    console.log('Quality metric clicked:', metricType, bucketRange);
+    setSelectedMetric(metricType);
+    setSelectedBucket(bucketRange);
+    setShowOrderDetails(true);
+  };
+
+  const getOrdersForBucket = (metricType: string, bucketRange: string): OrderData[] => {
+    const filteredData = getFilteredData();
+    if (metricType === 'all') return filteredData.orders;
+    
+    const metric = filteredData.metrics[metricType as keyof TimeMetrics];
+    const bucket = metric?.find(b => b.range === bucketRange);
+    return bucket?.orders || [];
+  };
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6 space-y-6">
+      <div className="container mx-auto p-6 space-y-8">
         <DashboardHeader 
           onSettingsClick={() => setIsSettingsOpen(true)}
         />
         
-        <StatusBar 
+        <div className="mb-4">
+          <h1 className="text-3xl font-bold gradient-text">Photawn Dashboard</h1>
+          <p className="text-muted-foreground">Operations Performance & Quality Management</p>
+        </div>
+        
+        <StatusBar
           isConnected={isConnected}
           lastUpdate={lastUpdate}
           onRefresh={() => connectToSheet()}
         />
-        
-        {/* Loading State */}
-        {isLoading && (
-          <div className="p-8 text-center rounded-lg border bg-card text-card-foreground shadow-sm">
-            <div className="flex items-center justify-center space-x-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-              <span className="text-muted-foreground">Loading dashboard data...</span>
-            </div>
-          </div>
-        )}
-        
-        
-        {/* Top Level Filters Section - Always Visible */}
-        <div className="mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-lg border bg-card/50 border-border/50">
-            {/* Date Range Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                Date Range
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="date"
-                  value={dateRange.start}
-                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
-                  className="px-3 py-2 text-sm border rounded-md bg-background"
-                />
-                <input
-                  type="date"
-                  value={dateRange.end}
-                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
-                  className="px-3 py-2 text-sm border rounded-md bg-background"
-                />
-              </div>
-            </div>
 
-            {/* Dark Store Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dark Store</label>
-              <select
-                value={selectedDarkstore}
-                onChange={(e) => setSelectedDarkstore(e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-              >
-                <option value="all">All Stores ({getFilteredData().orders.length})</option>
-                {darkstores.map((store) => (
-                  <option key={store} value={store}>
-                    {store}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Brand Filter */}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Brand</label>
-              <select
-                value={selectedBrand}
-                onChange={(e) => setSelectedBrand(e.target.value)}
-                className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-              >
-                <option value="all">All Brands</option>
-                {brands.map((brand) => (
-                  <option key={brand} value={brand}>
-                    {brand}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          
-          {/* Active Filters Summary */}
-          <div className="mt-2 text-sm text-muted-foreground">
-            Showing {getFilteredData().orders.length} orders
-            {selectedDarkstore !== "all" && ` from ${selectedDarkstore}`}
-            {selectedBrand !== "all" && ` (${selectedBrand})`}
-            {(dateRange.start || dateRange.end) && ` between ${dateRange.start || 'start'} - ${dateRange.end || 'end'}`}
-          </div>
-        </div>
-
-        {/* Filters Section - Detailed */}
-        {(darkstores.length > 0 || brands.length > 0) && (
-          <div className="animate-fade-in mb-6">
-            <FiltersSection
-              darkstores={darkstores}
-              brands={brands}
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-1">
+            <FiltersSection 
               selectedDarkstore={selectedDarkstore}
-              selectedBrand={selectedBrand}
-              dateRange={dateRange}
-              totalOrders={dashboardData.orders.length}
               onDarkstoreChange={setSelectedDarkstore}
+              darkstores={darkstores}
+              selectedBrand={selectedBrand}
               onBrandChange={setSelectedBrand}
+              brands={brands}
+              dateRange={dateRange}
               onDateRangeChange={setDateRange}
+              totalOrders={dashboardData.orders.length}
               onClearFilters={() => {
                 setSelectedDarkstore("all");
                 setSelectedBrand("all");
@@ -631,91 +599,51 @@ Powai,Samsung,8/24/2025 4:10:00 PM,8/24/2025 4:20:00 PM,8/24/2025 4:22:00 PM,8/2
               }}
             />
           </div>
+        </div>
+
+        <Tabs defaultValue="speed" className="space-y-8">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="speed" className="text-sm font-medium">
+              Speed Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="quality" className="text-sm font-medium">
+              Quality Dashboard
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="speed" className="space-y-8">
+            <MetricsOverview summary={getFilteredData().summary} />
+            
+            <TimeMetricsGrid
+              metrics={getFilteredData().metrics}
+              onMetricClick={handleMetricClick}
+            />
+
+            <ChartsSection metrics={getFilteredData().metrics} />
+          </TabsContent>
+
+          <TabsContent value="quality" className="space-y-8">
+            <QualityDashboard onMetricClick={handleQualityMetricClick} />
+          </TabsContent>
+        </Tabs>
+
+        {showOrderDetails && selectedMetric && selectedBucket && (
+          <OrderDetailsView
+            metricType={selectedMetric}
+            bucketRange={selectedBucket}
+            orders={getOrdersForBucket(selectedMetric, selectedBucket)}
+            onBack={() => setShowOrderDetails(false)}
+          />
         )}
 
-        <div className="animate-slide-in space-y-8">
-          {!showOrderDetails ? (
-            <>
-              <MetricsOverview summary={getFilteredData().summary} />
-              
-              {/* Tabs for Time Metrics vs Quality Metrics */}
-              <div className="space-y-6">
-                <div className="border-b border-border">
-                  <nav className="flex space-x-8">
-                    <button
-                      onClick={() => setActiveTab('time')}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                        activeTab === 'time'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                      }`}
-                    >
-                      Time Metrics
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('quality')}
-                      className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                        activeTab === 'quality'
-                          ? 'border-primary text-primary'
-                          : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                      }`}
-                    >
-                      Quality Metrics
-                    </button>
-                  </nav>
-                </div>
-                
-                {activeTab === 'time' ? (
-                  <>
-                    <TimeMetricsGrid 
-                      metrics={getFilteredData().metrics}
-                      onMetricClick={handleMetricClick}
-                    />
-                    <ChartsSection metrics={getFilteredData().metrics} />
-                  </>
-                ) : (
-                  <QualityMetrics onMetricClick={handleMetricClick} />
-                )}
-              </div>
-              
-              {/* All Orders Section */}
-              <section className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-semibold text-foreground gradient-text">All Orders Data</h2>
-                  <div className="text-sm text-muted-foreground">
-                    Showing {getFilteredData().orders.length} orders
-                    {selectedDarkstore !== "all" && ` for ${selectedDarkstore}`}
-                    {selectedBrand !== "all" && ` (${selectedBrand})`}
-                    {(dateRange.start || dateRange.end) && ` in date range`}
-                  </div>
-                </div>
-                <OrderDetailsView 
-                  orders={getFilteredData().orders}
-                  metricType="all"
-                  bucketRange="all"
-                  onBack={() => {}}
-                  showBackButton={false}
-                />
-              </section>
-            </>
-          ) : (
-            <OrderDetailsView 
-              orders={getSelectedOrders()}
-              metricType={selectedMetric!}
-              bucketRange={selectedBucket!}
-              onBack={() => setShowOrderDetails(false)}
-            />
-          )}
-        </div>
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+          sheetId={sheetId}
+          onSheetIdChange={setSheetId}
+          onConnect={connectToSheet}
+        />
       </div>
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        sheetId={sheetId}
-        onSheetIdChange={setSheetId}
-        onConnect={connectToSheet}
-      />
     </div>
   );
 };
